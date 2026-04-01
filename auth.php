@@ -4,7 +4,7 @@ require_once 'php_pdo.php';
 
 function login($login, $mdp) {
     global $pdo;
-    $sql = "SELECT * FROM visiteur WHERE login = :login LIMIT 1";
+    $sql = "SELECT * FROM Visiteur WHERE login = :login LIMIT 1";
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['login' => $login]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
