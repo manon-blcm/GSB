@@ -1,8 +1,8 @@
 <?php
 $host = 'localhost';
 $dbname = 'gsbV2';
-$user = 'admin_gsb';
-$pass = 'admin123';
+$user = 'adminsite';
+$pass = 'admin1';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
