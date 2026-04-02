@@ -9,7 +9,7 @@ function login($login, $mdp) {
     $stmt->execute(['login' => $login]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user && password_verify($mdp, $user['mdp'])) {
+    if ($user && $mdp === $user['mdp']) {
         $_SESSION['user_id']     = $user['id'];
         $_SESSION['user_nom']    = $user['nom'];
         $_SESSION['user_prenom'] = $user['prenom'];
