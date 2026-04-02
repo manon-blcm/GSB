@@ -6,7 +6,7 @@ if (!is_logged_in()) {
 }
 
 global $pdo;
-$stmt = $pdo->prepare("SELECT * FROM visiteur WHERE id = :id");
+$stmt = $pdo->prepare("SELECT * FROM Visiteur WHERE id = :id");
 $stmt->execute(['id' => $_SESSION['user_id']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 ?>
