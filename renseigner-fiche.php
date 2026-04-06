@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$moisSelectionne = $_GET['mois'] ?? null;
+$moisSelectionne = $_GET['mois'] ?? $_POST['mois'] ?? null;
 $lignesForfait = [];
 $lignesHorsForfait = [];
 $ficheChargee = null;
@@ -272,16 +272,52 @@ if ($moisSelectionne) {
                 </button>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; width:100%;">
                     <button type="submit" form="form-supprimer" class="btn-primary"
-                        onclick="return confirm('Supprimer définitivement cette fiche ?')">Supprimer la fiche</button>
+                        onclick="return confirm('Supprimer définitivement cette fiche ?')">🗑 Supprimer la fiche</button>
                     <button type="submit" class="btn-primary">Enregistrer la fiche</button>
                 </div>
                 <?php endif; ?>
             </form>
 
+            <!-- Récapitulatif après enregistrement -->
+            <?php if ($succes && !empty($lignesForfait)): ?>
+            <div style="margin-top:20px;">
+                <h3 style="color:#0a2a66; margin-bottom:10px;">Récapitulatif des frais forfaitaires</h3>
+                <table class="table-fiches">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Montant unitaire</th>
+                            <th>Quantité</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $totalForfait = 0;
+                        foreach ($lignesForfait as $ligne):
+                            $total = $ligne['quantite'] * $ligne['montant'];
+                            $totalForfait += $total;
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($ligne['libelle']) ?></td>
+                            <td><?= number_format($ligne['montant'], 2, ',', ' ') ?> €</td>
+                            <td><?= $ligne['quantite'] ?></td>
+                            <td><?= number_format($total, 2, ',', ' ') ?> €</td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <tr style="font-weight:bold; background:#f0f4fa;">
+                            <td colspan="3">Total frais forfaitisés</td>
+                            <td><?= number_format($totalForfait, 2, ',', ' ') ?> €</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
             <?php if ($modifiable): ?>
-            <form id="form-supprimer" method="post" action="supprimer-fiche.php">
-                <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
-            </form>
+                <form id="form-supprimer" method="post" action="supprimer-fiche.php">
+                    <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
+                </form>
             <?php endif; ?>
 
             <?php endif; ?>
