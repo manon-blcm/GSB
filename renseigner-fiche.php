@@ -71,32 +71,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->prepare("DELETE FROM LigneFraisHorsForfait WHERE idVisiteur=:id AND mois=:mois")
                 ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
 
-            $dateMin = date('Y-m-d', strtotime('-1 year'));
-
             foreach ($_POST['hf_libelle'] ?? [] as $i => $libelle) {
                 $libelle = trim($libelle);
                 $date    = $_POST['hf_date'][$i] ?? '';
                 $montant = $_POST['hf_montant'][$i] ?? 0;
 
                 if ($libelle && $date && $montant > 0) {
-                    if (!strtotime($date)) {
-                        $erreur = "La date d'engagement doit être valide.";
-                        break;
-                    }
-                    if ($date < $dateMin) {
-                        $erreur = "La date d'engagement doit se situer dans l'année écoulée.";
-                        break;
-                    }
                     $pdo->prepare("INSERT INTO LigneFraisHorsForfait (idVisiteur, mois, libelle, date, montant) VALUES (:id, :mois, :lib, :date, :montant)")
                         ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois, 'lib' => $libelle, 'date' => $date, 'montant' => $montant]);
                 }
             }
 
-            if (!$erreur) {
-                $pdo->prepare("UPDATE FicheFrais SET dateModif=CURDATE() WHERE idVisiteur=:id AND mois=:mois")
-                    ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
-                $succes = "Fiche enregistrée avec succès !";
-            }
+            $pdo->prepare("UPDATE FicheFrais SET dateModif=CURDATE() WHERE idVisiteur=:id AND mois=:mois")
+                ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
+            $succes = "Fiche enregistrée avec succès !";
         }
     }
 }
@@ -158,10 +146,10 @@ if ($moisSelectionne) {
             <h2 class="form-title">Renseigner ou modifier une fiche de frais</h2>
 
             <?php if ($erreur): ?>
-                <p style="color:red; margin-bottom:15px;"> <?= htmlspecialchars($erreur) ?></p>
+                <p style="color:red; margin-bottom:15px;">❌ <?= htmlspecialchars($erreur) ?></p>
             <?php endif; ?>
             <?php if ($succes || isset($_GET['succes'])): ?>
-                <p style="color:green; margin-bottom:15px;"> <?= $succes ?: (isset($_GET['succes']) && $_GET['succes'] === 'suppression' ? 'Fiche supprimée.' : 'Fiche créée avec succès !') ?></p>
+                <p style="color:green; margin-bottom:15px;">✅ <?= $succes ?: (isset($_GET['succes']) && $_GET['succes'] === 'suppression' ? 'Fiche supprimée.' : 'Fiche créée avec succès !') ?></p>
             <?php endif; ?>
 
             <div class="choix-mois">
@@ -222,7 +210,7 @@ if ($moisSelectionne) {
             <h3>Fiche de <?= $moisLabel ?> — <span style="color:#0a2a66"><?= $etatLabel ?></span></h3>
 
             <?php if (!$modifiable): ?>
-                <p style="color:orange; margin:10px 0;"> Cette fiche ne peut plus être modifiée.</p>
+                <p style="color:orange; margin:10px 0;">⚠️ Cette fiche ne peut plus être modifiée.</p>
             <?php endif; ?>
 
             <form method="post" action="renseigner-fiche.php">
@@ -240,6 +228,42 @@ if ($moisSelectionne) {
                     </div>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- ✅ Récapitulatif juste après les frais forfaitaires -->
+                <?php if ($succes && !empty($lignesForfait)): ?>
+                <div style="margin-top:20px;">
+                    <h3 style="color:#0a2a66; margin-bottom:10px;">Récapitulatif des frais forfaitaires</h3>
+                    <table class="table-fiches">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Montant unitaire</th>
+                                <th>Quantité</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $totalForfait = 0;
+                            foreach ($lignesForfait as $ligne):
+                                $total = $ligne['quantite'] * $ligne['montant'];
+                                $totalForfait += $total;
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($ligne['libelle']) ?></td>
+                                <td><?= number_format($ligne['montant'], 2, ',', ' ') ?> €</td>
+                                <td><?= $ligne['quantite'] ?></td>
+                                <td><?= number_format($total, 2, ',', ' ') ?> €</td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <tr style="font-weight:bold; background:#f0f4fa;">
+                                <td colspan="3">Total frais forfaitisés</td>
+                                <td><?= number_format($totalForfait, 2, ',', ' ') ?> €</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
 
                 <hr>
 
@@ -278,46 +302,10 @@ if ($moisSelectionne) {
                 <?php endif; ?>
             </form>
 
-            <!-- Récapitulatif après enregistrement -->
-            <?php if ($succes && !empty($lignesForfait)): ?>
-            <div style="margin-top:20px;">
-                <h3 style="color:#0a2a66; margin-bottom:10px;">Récapitulatif des frais forfaitaires</h3>
-                <table class="table-fiches">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Montant unitaire</th>
-                            <th>Quantité</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $totalForfait = 0;
-                        foreach ($lignesForfait as $ligne):
-                            $total = $ligne['quantite'] * $ligne['montant'];
-                            $totalForfait += $total;
-                        ?>
-                        <tr>
-                            <td><?= htmlspecialchars($ligne['libelle']) ?></td>
-                            <td><?= number_format($ligne['montant'], 2, ',', ' ') ?> €</td>
-                            <td><?= $ligne['quantite'] ?></td>
-                            <td><?= number_format($total, 2, ',', ' ') ?> €</td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <tr style="font-weight:bold; background:#f0f4fa;">
-                            <td colspan="3">Total frais forfaitisés</td>
-                            <td><?= number_format($totalForfait, 2, ',', ' ') ?> €</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <?php endif; ?>
-
             <?php if ($modifiable): ?>
-                <form id="form-supprimer" method="post" action="supprimer-fiche.php">
-                    <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
-                </form>
+            <form id="form-supprimer" method="post" action="supprimer-fiche.php">
+                <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
+            </form>
             <?php endif; ?>
 
             <?php endif; ?>
