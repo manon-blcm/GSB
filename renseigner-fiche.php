@@ -19,9 +19,18 @@ $fiches = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $forfaits = $pdo->query("SELECT * FROM FraisForfait")->fetchAll(PDO::FETCH_ASSOC);
 
 $mois_fr = [
-    '01' => 'Janvier', '02' => 'Février', '03' => 'Mars', '04' => 'Avril',
-    '05' => 'Mai', '06' => 'Juin', '07' => 'Juillet', '08' => 'Août',
-    '09' => 'Septembre', '10' => 'Octobre', '11' => 'Novembre', '12' => 'Décembre'
+    '01' => 'Janvier',
+    '02' => 'Février',
+    '03' => 'Mars',
+    '04' => 'Avril',
+    '05' => 'Mai',
+    '06' => 'Juin',
+    '07' => 'Juillet',
+    '08' => 'Août',
+    '09' => 'Septembre',
+    '10' => 'Octobre',
+    '11' => 'Novembre',
+    '12' => 'Décembre'
 ];
 
 $etats_fr = [
@@ -70,18 +79,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             $pdo->prepare("DELETE FROM LigneFraisHorsForfait WHERE idVisiteur=:id AND mois=:mois")
                 ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
+ $dateMin = date('Y-m-d', strtotime('-1 year'));
 
-            foreach ($_POST['hf_libelle'] ?? [] as $i => $libelle) {
-                $libelle = trim($libelle);
-                $date    = $_POST['hf_date'][$i] ?? '';
-                $montant = $_POST['hf_montant'][$i] ?? 0;
+foreach ($_POST['hf_libelle'] ?? [] as $i => $libelle) {
+    $libelle = trim($libelle);
+    $date    = $_POST['hf_date'][$i] ?? '';
+    $montant = $_POST['hf_montant'][$i] ?? 0;
 
-                if ($libelle && $date && $montant > 0) {
-                    $pdo->prepare("INSERT INTO LigneFraisHorsForfait (idVisiteur, mois, libelle, date, montant) VALUES (:id, :mois, :lib, :date, :montant)")
-                        ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois, 'lib' => $libelle, 'date' => $date, 'montant' => $montant]);
-                }
-            }
-
+    if ($libelle && $date && $montant > 0) {
+        if (!strtotime($date)) {
+            $erreur = "La date d'engagement doit être valide.";
+            break;
+        }
+        if ($date < $dateMin) {
+            $erreur = "La date d'engagement doit se situer dans l'année écoulée.";
+            break;
+        }
+        $pdo->prepare("INSERT INTO LigneFraisHorsForfait (idVisiteur, mois, libelle, date, montant) VALUES (:id, :mois, :lib, :date, :montant)")
+            ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois, 'lib' => $libelle, 'date' => $date, 'montant' => $montant]);
+    }
+}
             $pdo->prepare("UPDATE FicheFrais SET dateModif=CURDATE() WHERE idVisiteur=:id AND mois=:mois")
                 ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
             $succes = "Fiche enregistrée avec succès !";
@@ -110,12 +127,14 @@ if ($moisSelectionne) {
 ?>
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <title>GSB – Renseigner une fiche</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="renseigner-fiche.css">
 </head>
+
 <body>
     <header class="header">
         <div class="header-left">
@@ -146,10 +165,10 @@ if ($moisSelectionne) {
             <h2 class="form-title">Renseigner ou modifier une fiche de frais</h2>
 
             <?php if ($erreur): ?>
-                <p style="color:red; margin-bottom:15px;">❌ <?= htmlspecialchars($erreur) ?></p>
+                <p style="color:red; margin-bottom:15px;"> <?= htmlspecialchars($erreur) ?></p>
             <?php endif; ?>
             <?php if ($succes || isset($_GET['succes'])): ?>
-                <p style="color:green; margin-bottom:15px;">✅ <?= $succes ?: (isset($_GET['succes']) && $_GET['succes'] === 'suppression' ? 'Fiche supprimée.' : 'Fiche créée avec succès !') ?></p>
+                <p style="color:green; margin-bottom:15px;"> <?= $succes ?: (isset($_GET['succes']) && $_GET['succes'] === 'suppression' ? 'Fiche supprimée.' : 'Fiche créée avec succès !') ?></p>
             <?php endif; ?>
 
             <div class="choix-mois">
@@ -161,9 +180,9 @@ if ($moisSelectionne) {
                             $a = substr($f['mois'], 0, 4);
                             $m = substr($f['mois'], 4, 2);
                         ?>
-                        <option value="<?= $f['mois'] ?>" <?= $moisSelectionne === $f['mois'] ? 'selected' : '' ?>>
-                            <?= ($mois_fr[$m] ?? $m) . ' ' . $a ?>
-                        </option>
+                            <option value="<?= $f['mois'] ?>" <?= $moisSelectionne === $f['mois'] ? 'selected' : '' ?>>
+                                <?= ($mois_fr[$m] ?? $m) . ' ' . $a ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                     <button type="submit" class="btn-secondary">Charger la fiche</button>
@@ -198,115 +217,101 @@ if ($moisSelectionne) {
             </div>
 
             <?php if ($ficheChargee): ?>
-            <hr>
-            <?php
+                <hr>
+                <?php
                 $a = substr($moisSelectionne, 0, 4);
                 $m = substr($moisSelectionne, 4, 2);
                 $moisLabel = ($mois_fr[$m] ?? $m) . ' ' . $a;
                 $modifiable = ($ficheChargee['idEtat'] === 'CR');
                 $etatLabel = $etats_fr[$ficheChargee['idEtat']] ?? $ficheChargee['etat'];
-            ?>
+                ?>
 
-            <h3>Fiche de <?= $moisLabel ?> — <span style="color:#0a2a66"><?= $etatLabel ?></span></h3>
+                <h3>Fiche de <?= $moisLabel ?> — <span style="color:#0a2a66"><?= $etatLabel ?></span></h3>
 
-            <?php if (!$modifiable): ?>
-                <p style="color:orange; margin:10px 0;">⚠️ Cette fiche ne peut plus être modifiée.</p>
-            <?php endif; ?>
+                <?php if (!$modifiable): ?>
+                    <p style="color:orange; margin:10px 0;"> Cette fiche ne peut plus être modifiée.</p>
+                <?php endif; ?>
 
-            <form method="post" action="renseigner-fiche.php">
-                <input type="hidden" name="action" value="enregistrer">
-                <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
+                <form method="post" action="renseigner-fiche.php">
+                    <input type="hidden" name="action" value="enregistrer">
+                    <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
 
-                <h3 style="margin-top:20px;">Frais forfaitaires</h3>
-                <div class="form-grid">
-                    <?php foreach ($lignesForfait as $ligne): ?>
-                    <div>
-                        <label><?= htmlspecialchars($ligne['libelle']) ?> (<?= number_format($ligne['montant'], 2, ',', ' ') ?> € / unité)</label>
-                        <input type="number" name="forfait[<?= $ligne['idFraisForfait'] ?>]"
-                            min="0" value="<?= $ligne['quantite'] ?>"
-                            <?= !$modifiable ? 'disabled' : '' ?> required>
+                    <h3 style="margin-top:20px;">Frais forfaitaires</h3>
+                    <div class="form-grid">
+                        <?php foreach ($lignesForfait as $ligne): ?>
+                            <div>
+                                <label><?= htmlspecialchars($ligne['libelle']) ?> (<?= number_format($ligne['montant'], 2, ',', ' ') ?> € / unité)</label>
+                                <input type="number" name="forfait[<?= $ligne['idFraisForfait'] ?>]"
+                                    min="0" value="<?= $ligne['quantite'] ?>"
+                                    <?= !$modifiable ? 'disabled' : '' ?> required>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                    <?php endforeach; ?>
-                </div>
 
-                <!-- ✅ Récapitulatif juste après les frais forfaitaires -->
-                <?php if ($succes && !empty($lignesForfait)): ?>
-                <div style="margin-top:20px;">
-                    <h3 style="color:#0a2a66; margin-bottom:10px;">Récapitulatif des frais forfaitaires</h3>
-                    <table class="table-fiches">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Montant unitaire</th>
-                                <th>Quantité</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <?php if ($succes && !empty($lignesForfait)): ?>
+                        <div style="margin-top:20px;">
+                            <h3 style="color:#0a2a66; margin-bottom:10px;">Récapitulatif des frais forfaitaires</h3>
                             <?php
                             $totalForfait = 0;
                             foreach ($lignesForfait as $ligne):
                                 $total = $ligne['quantite'] * $ligne['montant'];
                                 $totalForfait += $total;
                             ?>
-                            <tr>
-                                <td><?= htmlspecialchars($ligne['libelle']) ?></td>
-                                <td><?= number_format($ligne['montant'], 2, ',', ' ') ?> €</td>
-                                <td><?= $ligne['quantite'] ?></td>
-                                <td><?= number_format($total, 2, ',', ' ') ?> €</td>
-                            </tr>
+                                <div class="hors-forfait-item" style="margin-bottom:8px;">
+                                    <span style="min-width:200px; font-size:14px;"><?= htmlspecialchars($ligne['libelle']) ?></span>
+                                    <span style="min-width:120px; font-size:14px;"><?= number_format($ligne['montant'], 2, ',', ' ') ?> € / unité</span>
+                                    <span style="min-width:80px; font-size:14px;">Qté : <?= $ligne['quantite'] ?></span>
+                                    <span style="font-size:14px; font-weight:bold;"><?= number_format($total, 2, ',', ' ') ?> €</span>
+                                </div>
                             <?php endforeach; ?>
-                            <tr style="font-weight:bold; background:#f0f4fa;">
-                                <td colspan="3">Total frais forfaitisés</td>
-                                <td><?= number_format($totalForfait, 2, ',', ' ') ?> €</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <?php endif; ?>
-
-                <hr>
-
-                <h3>Frais hors forfait</h3>
-                <div class="hors-forfait-list" id="hf-list">
-                    <?php if (!empty($lignesHorsForfait)): ?>
-                        <?php foreach ($lignesHorsForfait as $ligne): ?>
-                        <div class="hors-forfait-item">
-                            <input type="date" name="hf_date[]" value="<?= $ligne['date'] ?>" <?= !$modifiable ? 'disabled' : '' ?> required>
-                            <input type="text" name="hf_libelle[]" value="<?= htmlspecialchars($ligne['libelle']) ?>" placeholder="Libellé" <?= !$modifiable ? 'disabled' : '' ?> required>
-                            <input type="number" step="0.01" min="0.01" name="hf_montant[]" value="<?= $ligne['montant'] ?>" placeholder="Montant (€)" <?= !$modifiable ? 'disabled' : '' ?> required>
-                            <?php if ($modifiable): ?>
-                                <button type="button" class="btn-secondary" onclick="this.parentElement.remove()">✕</button>
-                            <?php endif; ?>
-                        </div>
-                        <?php endforeach; ?>
-                    <?php elseif ($modifiable): ?>
-                        <div class="hors-forfait-item">
-                            <input type="date" name="hf_date[]" required>
-                            <input type="text" name="hf_libelle[]" placeholder="Libellé" required>
-                            <input type="number" step="0.01" min="0.01" name="hf_montant[]" placeholder="Montant (€)" required>
-                            <button type="button" class="btn-secondary" onclick="this.parentElement.remove()">✕</button>
+                            <div style="text-align:right; font-weight:bold; color:#0a2a66; margin-top:10px;">
+                                Total : <?= number_format($totalForfait, 2, ',', ' ') ?> €
+                            </div>
                         </div>
                     <?php endif; ?>
-                </div>
+
+                    <hr>
+
+                    <h3>Frais hors forfait</h3>
+                    <div class="hors-forfait-list" id="hf-list">
+                        <?php if (!empty($lignesHorsForfait)): ?>
+                            <?php foreach ($lignesHorsForfait as $ligne): ?>
+                                <div class="hors-forfait-item">
+                                    <input type="date" name="hf_date[]" value="<?= $ligne['date'] ?>" <?= !$modifiable ? 'disabled' : '' ?> required>
+                                    <input type="text" name="hf_libelle[]" value="<?= htmlspecialchars($ligne['libelle']) ?>" placeholder="Libellé" <?= !$modifiable ? 'disabled' : '' ?> required>
+                                    <input type="number" step="0.01" min="0.01" name="hf_montant[]" value="<?= $ligne['montant'] ?>" placeholder="Montant (€)" <?= !$modifiable ? 'disabled' : '' ?> required>
+                                    <?php if ($modifiable): ?>
+                                        <button type="button" class="btn-secondary" onclick="this.parentElement.remove()">✕</button>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php elseif ($modifiable): ?>
+                            <div class="hors-forfait-item">
+                                <input type="date" name="hf_date[]" required>
+                                <input type="text" name="hf_libelle[]" placeholder="Libellé" required>
+                                <input type="number" step="0.01" min="0.01" name="hf_montant[]" placeholder="Montant (€)" required>
+                                <button type="button" class="btn-secondary" onclick="this.parentElement.remove()">✕</button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($modifiable): ?>
+                        <button type="button" class="btn-secondary" style="margin-top:10px;" onclick="ajouterLigne()">
+                            + Ajouter un frais hors forfait
+                        </button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; width:100%;">
+                            <button type="submit" form="form-supprimer" class="btn-primary"
+                                onclick="return confirm('Supprimer définitivement cette fiche ?')"> Supprimer la fiche</button>
+                            <button type="submit" class="btn-primary">Enregistrer la fiche</button>
+                        </div>
+                    <?php endif; ?>
+                </form>
 
                 <?php if ($modifiable): ?>
-                <button type="button" class="btn-secondary" style="margin-top:10px;" onclick="ajouterLigne()">
-                    + Ajouter un frais hors forfait
-                </button>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; width:100%;">
-                    <button type="submit" form="form-supprimer" class="btn-primary"
-                        onclick="return confirm('Supprimer définitivement cette fiche ?')">🗑 Supprimer la fiche</button>
-                    <button type="submit" class="btn-primary">Enregistrer la fiche</button>
-                </div>
+                    <form id="form-supprimer" method="post" action="supprimer-fiche.php">
+                        <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
+                    </form>
                 <?php endif; ?>
-            </form>
-
-            <?php if ($modifiable): ?>
-            <form id="form-supprimer" method="post" action="supprimer-fiche.php">
-                <input type="hidden" name="mois" value="<?= $moisSelectionne ?>">
-            </form>
-            <?php endif; ?>
 
             <?php endif; ?>
 
@@ -333,4 +338,5 @@ if ($moisSelectionne) {
         }
     </script>
 </body>
+
 </html>
