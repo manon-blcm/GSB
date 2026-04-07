@@ -42,66 +42,119 @@ $etats_fr = [
 
 $erreur = '';
 $succes = '';
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
+    $userId = $_SESSION['user_id'];
+
     if ($_POST['action'] === 'creer') {
+
         $nouveauMois = $_POST['nouveauMoisAnnee'] . $_POST['nouveauMoisMois'];
+
         $check = $pdo->prepare("SELECT COUNT(*) FROM FicheFrais WHERE idVisiteur=:id AND mois=:mois");
-        $check->execute(['id' => $_SESSION['user_id'], 'mois' => $nouveauMois]);
+        $check->execute(['id' => $userId, 'mois' => $nouveauMois]);
+
         if ($check->fetchColumn() > 0) {
             $erreur = "Une fiche existe déjà pour ce mois.";
-        } else {
-            $pdo->prepare("INSERT INTO FicheFrais (idVisiteur, mois, nbJustificatifs, montantValide, dateModif, idEtat) VALUES (:id, :mois, 0, 0, CURDATE(), 'CR')")
-                ->execute(['id' => $_SESSION['user_id'], 'mois' => $nouveauMois]);
+        }
+
+        if (!$erreur) {
+
+            $pdo->prepare("INSERT INTO FicheFrais (idVisiteur, mois, nbJustificatifs, montantValide, dateModif, idEtat)
+                           VALUES (:id, :mois, 0, 0, CURDATE(), 'CR')")
+                ->execute(['id' => $userId, 'mois' => $nouveauMois]);
+
             foreach ($forfaits as $f) {
-                $pdo->prepare("INSERT INTO LigneFraisForfait (idVisiteur, mois, idFraisForfait, quantite) VALUES (:id, :mois, :idf, 0)")
-                    ->execute(['id' => $_SESSION['user_id'], 'mois' => $nouveauMois, 'idf' => $f['id']]);
+                $pdo->prepare("INSERT INTO LigneFraisForfait (idVisiteur, mois, idFraisForfait, quantite)
+                               VALUES (:id, :mois, :idf, 0)")
+                    ->execute([
+                        'id' => $userId,
+                        'mois' => $nouveauMois,
+                        'idf' => $f['id']
+                    ]);
             }
+
             header("Location: renseigner-fiche.php?mois=$nouveauMois&succes=1");
             exit;
         }
     }
 
+
     if ($_POST['action'] === 'enregistrer') {
+
         $mois = $_POST['mois'];
+
         $check = $pdo->prepare("SELECT idEtat FROM FicheFrais WHERE idVisiteur=:id AND mois=:mois");
-        $check->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
+        $check->execute(['id' => $userId, 'mois' => $mois]);
         $fiche = $check->fetch();
 
         if (!$fiche || $fiche['idEtat'] !== 'CR') {
             $erreur = "Cette fiche n'est pas modifiable.";
-        } else {
+        }
+
+        if (!$erreur) {
+
             foreach ($_POST['forfait'] as $idForfait => $quantite) {
-                $pdo->prepare("UPDATE LigneFraisForfait SET quantite=:q WHERE idVisiteur=:id AND mois=:mois AND idFraisForfait=:idf")
-                    ->execute(['q' => max(0, (int)$quantite), 'id' => $_SESSION['user_id'], 'mois' => $mois, 'idf' => $idForfait]);
+
+                $pdo->prepare("UPDATE LigneFraisForfait
+                               SET quantite=:q
+                               WHERE idVisiteur=:id AND mois=:mois AND idFraisForfait=:idf")
+                    ->execute([
+                        'q' => max(0, (int)$quantite),
+                        'id' => $userId,
+                        'mois' => $mois,
+                        'idf' => $idForfait
+                    ]);
             }
 
-            $pdo->prepare("DELETE FROM LigneFraisHorsForfait WHERE idVisiteur=:id AND mois=:mois")
-                ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
- $dateMin = date('Y-m-d', strtotime('-1 year'));
+            $pdo->prepare("DELETE FROM LigneFraisHorsForfait
+                           WHERE idVisiteur=:id AND mois=:mois")
+                ->execute(['id' => $userId, 'mois' => $mois]);
 
-foreach ($_POST['hf_libelle'] ?? [] as $i => $libelle) {
-    $libelle = trim($libelle);
-    $date    = $_POST['hf_date'][$i] ?? '';
-    $montant = $_POST['hf_montant'][$i] ?? 0;
+            $dateMin = date('Y-m-d', strtotime('-1 year'));
 
-    if ($libelle && $date && $montant > 0) {
-        if (!strtotime($date)) {
-            $erreur = "La date d'engagement doit être valide.";
-            break;
-        }
-        if ($date < $dateMin) {
-            $erreur = "La date d'engagement doit se situer dans l'année écoulée.";
-            break;
-        }
-        $pdo->prepare("INSERT INTO LigneFraisHorsForfait (idVisiteur, mois, libelle, date, montant) VALUES (:id, :mois, :lib, :date, :montant)")
-            ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois, 'lib' => $libelle, 'date' => $date, 'montant' => $montant]);
-    }
-}
-            $pdo->prepare("UPDATE FicheFrais SET dateModif=CURDATE() WHERE idVisiteur=:id AND mois=:mois")
-                ->execute(['id' => $_SESSION['user_id'], 'mois' => $mois]);
-            $succes = "Fiche enregistrée avec succès !";
+            foreach ($_POST['hf_libelle'] ?? [] as $i => $libelle) {
+
+                $libelle = trim($libelle);
+                $date    = $_POST['hf_date'][$i] ?? '';
+                $montant = $_POST['hf_montant'][$i] ?? 0;
+
+                if ($libelle && $date && $montant > 0) {
+
+                    if (!strtotime($date)) {
+                        $erreur = "La date d'engagement doit être valide.";
+                        break;
+                    }
+
+                    if ($date < $dateMin) {
+                        $erreur = "La date d'engagement doit se situer dans l'année écoulée.";
+                        break;
+                    }
+
+                    $pdo->prepare("INSERT INTO LigneFraisHorsForfait
+                                   (idVisiteur, mois, libelle, date, montant)
+                                   VALUES (:id, :mois, :lib, :date, :montant)")
+                        ->execute([
+                            'id' => $userId,
+                            'mois' => $mois,
+                            'lib' => $libelle,
+                            'date' => $date,
+                            'montant' => $montant
+                        ]);
+                }
+            }
+
+            if (!$erreur) {
+
+                $pdo->prepare("UPDATE FicheFrais
+                               SET dateModif=CURDATE()
+                               WHERE idVisiteur=:id AND mois=:mois")
+                    ->execute([
+                        'id' => $userId,
+                        'mois' => $mois
+                    ]);
+
+                $succes = "Fiche enregistrée avec succès !";
+            }
         }
     }
 }
